@@ -21,18 +21,18 @@ function init() {
   	// 2. Cámara
   	camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
     
+    // Posición de escritorio (se mantiene igual, ya funcionaba)
+  	camera.position.set(1.5, 1.6, 2.0);
 
-  	camera.position.set(1.5, 1.6, 2.0); // (X=1.5, Y=1.6, Z=2.0)
-
-  	// 3. LUCES (Con intensidad alta para evitar VR oscura)
-  	const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); // Alta intensidad
+  	// 3. LUCES (Con intensidad alta)
+  	const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
   	scene.add(ambientLight);
     
-    const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x888888, 1.5); // Alta intensidad
+    const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x888888, 1.5);
     hemisphereLight.position.set(0, 3, 0);
     scene.add(hemisphereLight);
 
- 
+  	// Añadimos una cuadrícula (GridHelper) como referencia
   	const gridHelper = new THREE.GridHelper(20, 20);
   	scene.add(gridHelper);
 
@@ -54,29 +54,27 @@ function init() {
   	// Inicializamos los OrbitControls (para modo escritorio)
   	controls = new OrbitControls(camera, renderer.domElement);
   	controls.enableDamping = true;
-    // Apuntamos hacia la pared del fondo (hacia Z=0)
   	controls.target.set(1.5, 1.6, 0); 
   	controls.update();
 
   	// 6. Cargar el modelo FBX
   	const loader = new FBXLoader();
-    
-    // La ruta de las texturas sigue siendo "Sala/"
     loader.setResourcePath('Sala/'); 
 
   	loader.load(
-  	 	'Sala/Sala_v2.fbx',
+    	'Sala/Sala_v2.fbx', // Seguimos usando Sala_v2.fbx para evitar caché
     	 
+    	// -- onLoad (Cuando se carga bien) --
     	(fbx) => {
     	 	model = fbx;
 
+        	// --- LÓGICA DE CENTRADO ---
         	const bbox = new THREE.Box3().setFromObject(model);
         	const center = bbox.getCenter(new THREE.Vector3());
         	model.position.x -= center.x;
         	model.position.z -= center.z;
-        	model.position.y -= bbox.min.y; // Pone el piso en Y=0
+        	model.position.y -= bbox.min.y;
 
-        	// --- LÓGICA DE TEXTURAS (Piso, Cuadros, Ventanas) ---
         	model.traverse((child) => {
             	if (child.isMesh) {
                 	child.castShadow = true;
@@ -91,6 +89,7 @@ function init() {
                             if (mat.map.image && mat.map.image.src.toLowerCase().endsWith('.png')) {
                             	mat.transparent = true;
                             	mat.alphaTest = 0.1;
+                                mat.depthWrite = false; // Ayuda con la transparencia
                         	}
                     	}
                         if (mat && (mat.name.toLowerCase().includes('glass') || mat.name.toLowerCase().includes('vidrio'))) {
@@ -102,9 +101,9 @@ function init() {
         	});
         	
         	vrGroup = new THREE.Group();
-        	vrGroup.add(model); // Añadimos el modelo ya centrado
+        	vrGroup.add(model); 
 
-        	vrGroup.position.set(-1.5, 0, -2.0); 
+        	vrGroup.position.set(-1.5, 0, -1.8); 
         	
     	 	scene.add(vrGroup);
     	 	console.log("Modelo cargado exitosamente.");
