@@ -21,8 +21,7 @@ function init() {
   	// 2. Cámara
   	camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
     
-    // --- ¡POSICIÓN CORREGIDA! ---
-    // Te pone en el centro del salón (1.5m en X, 2.0m en Z)
+
   	camera.position.set(1.5, 1.6, 2.0); // (X=1.5, Y=1.6, Z=2.0)
 
   	// 3. LUCES (Con intensidad alta para evitar VR oscura)
@@ -33,7 +32,7 @@ function init() {
     hemisphereLight.position.set(0, 3, 0);
     scene.add(hemisphereLight);
 
-  	// Añadimos una cuadrícula (GridHelper) como referencia
+ 
   	const gridHelper = new THREE.GridHelper(20, 20);
   	scene.add(gridHelper);
 
@@ -66,14 +65,11 @@ function init() {
     loader.setResourcePath('Sala/'); 
 
   	loader.load(
-        // --- ¡CARGA EL NUEVO MODELO PARA EVITAR CACHÉ! ---
-    	'Sala/Sala_v2.fbx',
+  	 	'Sala/Sala_v2.fbx',
     	 
-    	// -- onLoad (Cuando se carga bien) --
     	(fbx) => {
     	 	model = fbx;
 
-        	// --- LÓGICA DE CENTRADO (Esto centra el salón en la esquina 0,0,0) ---
         	const bbox = new THREE.Box3().setFromObject(model);
         	const center = bbox.getCenter(new THREE.Vector3());
         	model.position.x -= center.x;
@@ -89,20 +85,15 @@ function init() {
                 	const materials = Array.isArray(child.material) ? child.material : [child.material];
                 	
                 	materials.forEach(mat => {
-                        // Hace que el piso y paredes se vean por ambos lados
                         mat.side = THREE.DoubleSide; 
-
-                    	// 1. Arregla el color de TODAS las texturas
                         if (mat && mat.map) {
                         	mat.map.encoding = THREE.sRGBEncoding;
-                        	// 2. Arregla PNGs transparentes (como cuadros o personas)
                             if (mat.map.image && mat.map.image.src.toLowerCase().endsWith('.png')) {
                             	mat.transparent = true;
                             	mat.alphaTest = 0.1;
                         	}
                     	}
-                        // 3. Arregla las ventanas (VIDRIO)
-                    	if (mat && (mat.name.toLowerCase().includes('glass') || mat.name.toLowerCase().includes('vidrio'))) {
+                        if (mat && (mat.name.toLowerCase().includes('glass') || mat.name.toLowerCase().includes('vidrio'))) {
                         	mat.transparent = true;
                         	mat.opacity = 0.2;
                     	}
@@ -110,12 +101,10 @@ function init() {
             	}
         	});
         	
-        	// --- ¡POSICIÓN VR CORREGIDA! ---
         	vrGroup = new THREE.Group();
         	vrGroup.add(model); // Añadimos el modelo ya centrado
 
-        	// (1.5, 0, 2.0) te pone en el centro del salón de 3x4m
-        	vrGroup.position.set(1.5, 0, 2.0); 
+        	vrGroup.position.set(-1.5, 0, -2.0); 
         	
     	 	scene.add(vrGroup);
     	 	console.log("Modelo cargado exitosamente.");
@@ -142,7 +131,6 @@ function init() {
 // --- FUNCIONES AUXILIARES ---
 
 function animate() {
-    // No muevas la cámara con el mouse si estás en VR
     if (renderer.xr.isPresenting === false) {
   	    controls.update();
     }
