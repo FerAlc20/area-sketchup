@@ -20,8 +20,8 @@ function init() {
 
   	// --- CÁMARA ---
   	camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // Posición inicial de la cámara en modo escritorio (1m dentro del salón)
-  	camera.position.set(1.5, 1.6, 1.2); 
+    // Posición inicial de la cámara en modo escritorio (MÁS ADENTRO)
+  	camera.position.set(1.5, 1.6, 2.5); // Z era 1.2, ahora es 2.5 (más lejos de la puerta)
 
   	// --- LUCES ---
   	const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); // Luz ambiental alta
@@ -40,7 +40,7 @@ function init() {
   	renderer.setSize(window.innerWidth, window.innerHeight);
   	renderer.setPixelRatio(window.devicePixelRatio);
   	 
-    renderer.outputEncoding = THREE.sRGBEncoding; // Corrección de color (sRGB) para todo
+    renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.shadowMap.enabled = true;
     
   	// Habilitar VR (WebXR)
@@ -86,38 +86,33 @@ function init() {
                 	materials.forEach(mat => {
                         mat.side = THREE.DoubleSide; 
                         
+                        // Arregla el color de las texturas
                         if (mat && mat.map) {
-                            // --- ¡AJUSTE FUERTE PARA PNGs! ---
+                        	mat.map.encoding = THREE.sRGBEncoding;
+                            
+                            // --- ¡1. ARREGLO DE PNG (VENADO/CABALLO)! ---
                             if (mat.map.image && mat.map.image.src.toLowerCase().endsWith('.png')) {
                             	mat.transparent = true;
-                                mat.blending = THREE.NormalBlending; // Fuerza la mezcla de transparencia
-                            	mat.alphaTest = 0.05; // Un alphaTest bajo para cortar cualquier borde negro
-                                mat.depthWrite = true; // Mantener depthWrite en true para evitar problemas de orden
+                            	mat.alphaTest = 0.5; // "Recorta" el PNG (esta es la solución)
                         	} else {
-                                mat.transparent = false;
-                                mat.blending = THREE.NoBlending;
-                                mat.alphaTest = 0;
+                                mat.transparent = false; // Asegura que el piso NO sea transparente
                             }
-                            // Asegurarse de que el encoding se aplique al final para el mapa
-                        	mat.map.encoding = THREE.sRGBEncoding;
                     	}
-                    	// Arreglo de transparencia para VIDRIO
+                        // Arregla la transparencia de ventanas
                     	if (mat && (mat.name.toLowerCase().includes('glass') || mat.name.toLowerCase().includes('vidrio'))) {
                         	mat.transparent = true;
                         	mat.opacity = 0.2;
-                            mat.depthWrite = false; // El vidrio sí necesita depthWrite=false
-                            mat.side = THREE.FrontSide; // El vidrio suele ser de un solo lado
                     	}
                 	});
             	}
         	});
         	
-        	// --- POSICIÓN VR (Ajustada 1m hacia adentro, ya era correcta) ---
+        	// --- ¡2. POSICIÓN VR (MÁS ADENTRO)! ---
         	vrGroup = new THREE.Group();
         	vrGroup.add(model); 
 
-        	// Mueve el salón para que (0,0,0) sea 1m adentro de la puerta
-        	vrGroup.position.set(-1.5, 0, -1.2); 
+        	// (Z era -1.2, ahora es -2.5, que está MÁS ADENTRO)
+        	vrGroup.position.set(-1.5, 0, -2.5); 
         	
     	 	scene.add(vrGroup);
     	 	console.log("Modelo cargado exitosamente.");
@@ -146,7 +141,7 @@ function init() {
 // Loop de animación
 function animate() {
     if (renderer.xr.isPresenting === false) {
-  	    controls.update();
+G  	    controls.update();
     }
   	renderer.render(scene, camera);
 }
