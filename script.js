@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OrbitControls } from 'three/addons/controls/controls/OrbitControls.js'; // Ruta corregida
 
 // --- VARIABLES GLOBALES ---
 let camera, scene, renderer;
@@ -20,8 +20,9 @@ function init() {
 
   	// --- CÁMARA ---
   	camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // Posición inicial de la cámara en modo escritorio (MÁS ADENTRO)
-  	camera.position.set(1.5, 1.6, 2.5); // Z era 1.2, ahora es 2.5 (más lejos de la puerta)
+    // Posición inicial de la cámara en modo escritorio (EN EL CENTRO)
+    // Coordenadas para un salón de 3x4m: (X: 1.5, Z: 2.0)
+  	camera.position.set(1.5, 1.6, 2.0);
 
   	// --- LUCES ---
   	const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); // Luz ambiental alta
@@ -53,7 +54,8 @@ function init() {
   	// --- CONTROLES (Modo Escritorio) ---
   	controls = new OrbitControls(camera, renderer.domElement);
   	controls.enableDamping = true;
-  	controls.target.set(1.5, 1.6, 0); 
+    // Apuntamos hacia el centro del salón
+  	controls.target.set(1.5, 1.6, 2.0); 
   	controls.update();
 
   	// --- CARGADOR DE MODELO FBX ---
@@ -86,33 +88,44 @@ function init() {
                 	materials.forEach(mat => {
                         mat.side = THREE.DoubleSide; 
                         
-                        // Arregla el color de las texturas
                         if (mat && mat.map) {
                         	mat.map.encoding = THREE.sRGBEncoding;
                             
-                            // --- ¡1. ARREGLO DE PNG (VENADO/CABALLO)! ---
+                            // *** ARREGLO PNG (VENADO/RELOJ) - Revertido a solución simple y efectiva ***
                             if (mat.map.image && mat.map.image.src.toLowerCase().endsWith('.png')) {
                             	mat.transparent = true;
-                            	mat.alphaTest = 0.5; // "Recorta" el PNG (esta es la solución)
+                            	mat.alphaTest = 0.1; // Un umbral bajo para la transparencia
+                                // Quitado blending y depthWrite que causaron problemas.
                         	} else {
-                                mat.transparent = false; // Asegura que el piso NO sea transparente
+                                mat.transparent = false; // Asegura que otros materiales no sean transparentes por error.
                             }
                     	}
-                        // Arregla la transparencia de ventanas
+                        // *** ARREGLO VIDRIO (VENTANA) - Restaurado a transparencia y reflejo de cielo ***
                     	if (mat && (mat.name.toLowerCase().includes('glass') || mat.name.toLowerCase().includes('vidrio'))) {
                         	mat.transparent = true;
-                        	mat.opacity = 0.2;
+                        	mat.opacity = 0.4; // Menos opaco para ver reflejo
+                            mat.depthWrite = false; // Importante para la transparencia del vidrio
+                            mat.side = THREE.FrontSide; // El vidrio se dibuja normalmente desde un lado
+                            mat.envMap = new THREE.CubeTextureLoader() // Simulación de reflejo de cielo
+                                .setPath('Sala/') // Asegúrate de tener imágenes para el Cubemap aquí o cámbialo
+                                .load([
+                                    'posx.jpg', 'negx.jpg',
+                                    'posy.jpg', 'negy.jpg',
+                                    'posz.jpg', 'negz.jpg'
+                                ]);
+                            mat.metalness = 0.5; // Agrega un poco de metalizado para el reflejo
+                            mat.roughness = 0.1; // Baja la rugosidad para un reflejo más claro
                     	}
                 	});
             	}
         	});
         	
-        	// --- ¡2. POSICIÓN VR (MÁS ADENTRO)! ---
+        	// --- POSICIÓN VR (EN EL CENTRO) ---
         	vrGroup = new THREE.Group();
         	vrGroup.add(model); 
 
-        	// (Z era -1.2, ahora es -2.5, que está MÁS ADENTRO)
-        	vrGroup.position.set(-1.5, 0, -2.5); 
+        	// Mueve el salón para que (0,0,0) sea el centro del salón (1.5, 0, 2.0)
+        	vrGroup.position.set(-1.5, 0, -2.0); 
         	
     	 	scene.add(vrGroup);
     	 	console.log("Modelo cargado exitosamente.");
@@ -141,7 +154,7 @@ function init() {
 // Loop de animación
 function animate() {
     if (renderer.xr.isPresenting === false) {
-G  	    controls.update();
+  	    controls.update();
     }
   	renderer.render(scene, camera);
 }
