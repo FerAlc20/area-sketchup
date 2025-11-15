@@ -2,8 +2,7 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-// --- ¡RUTA CORREGIDA! (Quitamos el 'controls/' extra) ---
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; 
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // --- VARIABLES GLOBALES ---
 let camera, scene, renderer;
@@ -21,7 +20,7 @@ function init() {
 
   	// --- CÁMARA ---
   	camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // --- POSICIÓN WEB (AJUSTADA AL NUEVO CENTRO) ---
+    // Posición inicial de la cámara en modo escritorio (DENTRO del salón)
   	camera.position.set(1.5, 1.6, 2.5);
 
   	// --- LUCES ---
@@ -62,7 +61,7 @@ function init() {
     loader.setResourcePath('Sala/'); 
 
   	loader.load(
-        // Seguimos usando 'v2' para evitar caché
+        // Carga el modelo (usamos 'v2' para evitar caché)
     	'Sala/Sala_v2.fbx',
     	 
     	// (onLoad) Se ejecuta cuando el modelo carga
@@ -91,8 +90,7 @@ function init() {
                         if (mat && mat.map) {
                         	mat.map.encoding = THREE.sRGBEncoding;
                             
-                            // --- ARREGLO PNG (VENADO/RELOJ) ---
-                            // Vuelve a la solución simple y correcta
+                            // Arregla PNGs (Venado/Reloj)
                             if (mat.map.image && mat.map.image.src.toLowerCase().endsWith('.png')) {
                             	mat.transparent = true;
                             	mat.alphaTest = 0.5; // "Recorta" el PNG
@@ -100,8 +98,7 @@ function init() {
                                 mat.transparent = false; // Evita que el piso sea transparente
                             }
                     	}
-                        // --- ARREGLO VIDRIO (VENTANA) ---
-                        // (Se eliminó el 'envMap' que causaba las texturas blancas)
+                        // Arregla el Vidrio (Ventana)
                     	if (mat && (mat.name.toLowerCase().includes('glass') || mat.name.toLowerCase().includes('vidrio'))) {
                         	mat.transparent = true;
                         	mat.opacity = 0.2; // Transparencia simple
@@ -111,11 +108,11 @@ function init() {
             	}
         	});
         	
-        	// --- ¡POSICIÓN VR (MÁS ADENTRO)! ---
+        	// --- POSICIÓN VR (DENTRO DEL SALÓN) ---
         	vrGroup = new THREE.Group();
         	vrGroup.add(model); 
 
-        	// (Z era -1.2, ahora es -2.5, que está MÁS ADENTRO)
+        	// Mueve el salón para que (0,0,0) sea el centro
         	vrGroup.position.set(-1.5, 0, -2.5); 
         	
     	 	scene.add(vrGroup);
@@ -144,8 +141,10 @@ function init() {
 
 // Loop de animación
 function animate() {
+    // Solo actualiza los controles del mouse si NO estamos en modo VR
     if (renderer.xr.isPresenting === false) {
-G  	    controls.update();
+        // --- ¡ERROR DE TIIPO CORREGIDO! (Se quitó la 'G') ---
+  	    controls.update();
     }
   	renderer.render(scene, camera);
 }
