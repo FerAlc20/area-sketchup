@@ -26,7 +26,7 @@ function init() {
         1000
     );
 
-
+    // Posición inicial de la cámara en modo escritorio
     camera.position.set(0, 1.6, 3);
 
     // --- LUCES ---
@@ -42,7 +42,6 @@ function init() {
     scene.add(gridHelper);
 
     // --- RENDERIZADOR ---
-    // CORREGIDO: antialias en lugar de "antias"
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -65,9 +64,10 @@ function init() {
 
     // --- CARGADOR DE MODELO FBX ---
     const loader = new FBXLoader();
-    loader.setResourcePath('Sala/');
+    loader.setResourcePath('Sala/'); // carpeta donde están las texturas
 
     loader.load(
+        // Ajusta el nombre si cambias el archivo
         'Sala/Sala_v2.fbx',
 
         // onLoad
@@ -82,11 +82,14 @@ function init() {
             model.position.z -= center.z;
             model.position.y -= bbox.min.y; // piso en Y=0
 
-            // Ajustar materiales
+            // Recorre el modelo para ajustar materiales
             model.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+
+                    // Evitar que se "desactive" por frustum culling (problemas en VR)
+                    child.frustumCulled = false;
 
                     const materials = Array.isArray(child.material)
                         ? child.material
@@ -95,43 +98,92 @@ function init() {
                     materials.forEach((mat) => {
                         if (!mat) return;
 
-                        // Si quieres ver ambos lados de las caras:
                         mat.side = THREE.DoubleSide;
 
                         if (mat.map) {
                             // Corregir color
                             mat.map.encoding = THREE.sRGBEncoding;
 
-                           
-                            if (mat.map.format === THREE.RGBAFormat) {
+                            // Nombre del archivo de textura
+                            let texSrc = mat.map.image && mat.map.image.src
+                                ? mat.map.image.src.toLowerCase()
+                                : '';
+
+                            const isGlassSky =
+                                texSrc.includes('translucent_glass_sky_reflection');
+                            const isGlassCorr =
+                                texSrc.includes('translucent_glass_corrugated');
+
+                            // venado / reloj (v.png, r.png)
+                            const isDeer =
+                                texSrc.includes('/v.') || texSrc.endsWith('v.png');
+                            const isClock =
+                                texSrc.includes('/r.') || texSrc.endsWith('r.png');
+
+                            // --- VIDRIO VENTANA / PUERTA (Sky) ---
+                            if (isGlassSky) {
                                 mat.transparent = true;
-                                mat.alphaTest = 0.5; // recorta el PNG
+                                mat.opacity = 0.45;   // algo translúcido
+                                mat.depthWrite = false;
+                                mat.alphaTest = 0.0;
+                            }
+                            // --- VIDRIO MESA (Corrugated) ---
+                            else if (isGlassCorr) {
+                                mat.transparent = true;
+                                mat.opacity = 0.55;
+                                mat.depthWrite = false;
+                                mat.alphaTest = 0.0;
+                            }
+                            // --- PNGs recortados (venado / reloj) ---
+                            else if (
+                                texSrc.endsWith('.png') ||
+                                mat.map.format === THREE.RGBAFormat ||
+                                isDeer ||
+                                isClock
+                            ) {
+                                mat.transparent = true;
+                                mat.alphaTest = 0.5; // recorta fondo
+                                mat.depthWrite = true;
                             } else {
+                                // Texturas opacas normales
                                 mat.transparent = false;
                                 mat.alphaTest = 0.0;
+                                mat.depthWrite = true;
                             }
                         }
 
-                        // --- Vidrios/Ventanas por nombre de material ---
+                        // Fallback: si el material se llama algo con "glass" o "vidrio"
                         if (
                             mat.name &&
                             (mat.name.toLowerCase().includes('glass') ||
                                 mat.name.toLowerCase().includes('vidrio'))
                         ) {
                             mat.transparent = true;
-                            mat.opacity = 0.2;
+                            mat.opacity = Math.min(mat.opacity || 0.4, 0.6);
                             mat.depthWrite = false;
                             mat.alphaTest = 0.0;
+                        }
+
+                        // Cortinas (si tu material se llama así en el FBX)
+                        if (
+                            mat.name &&
+                            (mat.name.toLowerCase().includes('cortina') ||
+                                mat.name.toLowerCase().includes('curtain'))
+                        ) {
+                            mat.transparent = false;
+                            mat.alphaTest = 0.0;
+                            mat.depthWrite = true;
+                            mat.side = THREE.DoubleSide;
                         }
                     });
                 }
             });
 
-        
+            // --- POSICIÓN VR (DENTRO DEL SALÓN) ---
+            // El usuario en VR aparece en (0,0,0). Como el cuarto está centrado
+            // alrededor del origen y el piso en Y=0, queda dentro del cuarto.
             vrGroup = new THREE.Group();
             vrGroup.add(model);
-
-     
             vrGroup.position.set(0, 0, 0);
 
             scene.add(vrGroup);
