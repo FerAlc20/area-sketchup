@@ -1,4 +1,4 @@
-// 1. Importar módulos de Three.js
+// 1. Importar módulos de Three.js (¡Sintaxis corregida!)
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
@@ -108,7 +108,6 @@ function init() {
             	}
         	});
         	
-        	// --- POSICIÓN VR (DENTRO DEL SALÓN) ---
         	vrGroup = new THREE.Group();
         	vrGroup.add(model); 
 
@@ -119,7 +118,7 @@ function init() {
     	 	console.log("Modelo cargado exitosamente.");
     	},
     	 
-    	// (onProgress) Muestra el progreso de carga
+    	// (onProgress) Muestra el progreso de carga (¡SIN LA 'G'!)
     	(xhr) => {
     	 	console.log((xhr.loaded / xhr.total * 100) + '% cargado');
     	},
@@ -143,7 +142,6 @@ function init() {
 function animate() {
     // Solo actualiza los controles del mouse si NO estamos en modo VR
     if (renderer.xr.isPresenting === false) {
-        // --- ¡ERROR DE TIIPO CORREGIDO! (Se quitó la 'G') ---
   	    controls.update();
     }
   	renderer.render(scene, camera);
