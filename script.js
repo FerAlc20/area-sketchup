@@ -20,8 +20,8 @@ function init() {
 
   	// --- CÁMARA ---
   	camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // Posición inicial de la cámara en modo escritorio (dentro del salón)
-  	camera.position.set(1.5, 1.6, 2.2);
+    // Posición inicial de la cámara en modo escritorio (1m dentro del salón)
+  	camera.position.set(1.5, 1.6, 1.2); 
 
   	// --- LUCES ---
   	const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); // Luz ambiental alta
@@ -40,8 +40,7 @@ function init() {
   	renderer.setSize(window.innerWidth, window.innerHeight);
   	renderer.setPixelRatio(window.devicePixelRatio);
   	 
-    // Corrección de color (sRGB) para texturas
-    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.outputEncoding = THREE.sRGBEncoding; // Corrección de color (sRGB) para todo
     renderer.shadowMap.enabled = true;
     
   	// Habilitar VR (WebXR)
@@ -54,13 +53,11 @@ function init() {
   	// --- CONTROLES (Modo Escritorio) ---
   	controls = new OrbitControls(camera, renderer.domElement);
   	controls.enableDamping = true;
-    // Hacia dónde mira la cámara al inicio
   	controls.target.set(1.5, 1.6, 0); 
   	controls.update();
 
   	// --- CARGADOR DE MODELO FBX ---
   	const loader = new FBXLoader();
-    // Define dónde buscará las texturas (imágenes JPG/PNG)
     loader.setResourcePath('Sala/'); 
 
   	loader.load(
@@ -87,35 +84,40 @@ function init() {
                 	const materials = Array.isArray(child.material) ? child.material : [child.material];
                 	
                 	materials.forEach(mat => {
-                        // Hace que las caras se vean por ambos lados
                         mat.side = THREE.DoubleSide; 
                         
-                        // Arregla el color de las texturas
                         if (mat && mat.map) {
-                        	mat.map.encoding = THREE.sRGBEncoding;
-                            
-                            // Arregla la transparencia de archivos PNG (cuadros, venado)
+                            // --- ¡AJUSTE FUERTE PARA PNGs! ---
                             if (mat.map.image && mat.map.image.src.toLowerCase().endsWith('.png')) {
                             	mat.transparent = true;
-                            	mat.alphaTest = 0.5; // "Recorta" el fondo negro/transparente
-                        	}
+                                mat.blending = THREE.NormalBlending; // Fuerza la mezcla de transparencia
+                            	mat.alphaTest = 0.05; // Un alphaTest bajo para cortar cualquier borde negro
+                                mat.depthWrite = true; // Mantener depthWrite en true para evitar problemas de orden
+                        	} else {
+                                mat.transparent = false;
+                                mat.blending = THREE.NoBlending;
+                                mat.alphaTest = 0;
+                            }
+                            // Asegurarse de que el encoding se aplique al final para el mapa
+                        	mat.map.encoding = THREE.sRGBEncoding;
                     	}
-                        // Arregla la transparencia de ventanas
+                    	// Arreglo de transparencia para VIDRIO
                     	if (mat && (mat.name.toLowerCase().includes('glass') || mat.name.toLowerCase().includes('vidrio'))) {
                         	mat.transparent = true;
                         	mat.opacity = 0.2;
+                            mat.depthWrite = false; // El vidrio sí necesita depthWrite=false
+                            mat.side = THREE.FrontSide; // El vidrio suele ser de un solo lado
                     	}
                 	});
             	}
         	});
         	
-        	// --- POSICIÓN VR ---
-            // En VR, el usuario está en (0,0,0), así que movemos el salón
+        	// --- POSICIÓN VR (Ajustada 1m hacia adentro, ya era correcta) ---
         	vrGroup = new THREE.Group();
         	vrGroup.add(model); 
 
-        	// Mueve el salón para que (0,0,0) sea el centro (1.5, 0, 2.2)
-        	vrGroup.position.set(-1.5, 0, -2.2); 
+        	// Mueve el salón para que (0,0,0) sea 1m adentro de la puerta
+        	vrGroup.position.set(-1.5, 0, -1.2); 
         	
     	 	scene.add(vrGroup);
     	 	console.log("Modelo cargado exitosamente.");
@@ -141,13 +143,11 @@ function init() {
 
 // --- FUNCIONES AUXILIARES ---
 
-// Loop de animación (se ejecuta 60 veces por segundo)
+// Loop de animación
 function animate() {
-    // Solo actualiza los controles del mouse si NO estamos en modo VR
     if (renderer.xr.isPresenting === false) {
   	    controls.update();
     }
-    // Dibuja la escena
   	renderer.render(scene, camera);
 }
 
