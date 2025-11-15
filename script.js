@@ -21,8 +21,9 @@ function init() {
   	// 2. Cámara
   	camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
     
-    // Posición de cámara escritorio (DENTRO del nuevo salón)
-  	camera.position.set(1.5, 1.6, 1.5); // Ajustado para el salón de 3x4m
+    // --- ¡POSICIÓN CORREGIDA! ---
+    // Te pone en el centro del salón (1.5m en X, 2.0m en Z)
+  	camera.position.set(1.5, 1.6, 2.0); // (X=1.5, Y=1.6, Z=2.0)
 
   	// 3. LUCES (Con intensidad alta para evitar VR oscura)
   	const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); // Alta intensidad
@@ -54,20 +55,19 @@ function init() {
   	// Inicializamos los OrbitControls (para modo escritorio)
   	controls = new OrbitControls(camera, renderer.domElement);
   	controls.enableDamping = true;
-  	controls.target.set(0, 1.6, 0); // Apuntamos al centro del salón
+    // Apuntamos hacia la pared del fondo (hacia Z=0)
+  	controls.target.set(1.5, 1.6, 0); 
   	controls.update();
 
   	// 6. Cargar el modelo FBX
   	const loader = new FBXLoader();
     
-    // --- ¡CAMBIO IMPORTANTE DE RUTA! ---
-    // Ahora busca texturas en la carpeta "Sala/"
+    // La ruta de las texturas sigue siendo "Sala/"
     loader.setResourcePath('Sala/'); 
 
   	loader.load(
-        // --- ¡CAMBIO IMPORTANTE DE RUTA! ---
-        // Ahora carga el modelo "Sala.fbx" desde la carpeta "Sala/"
-    	'Sala/Sala.fbx',
+        // --- ¡CARGA EL NUEVO MODELO PARA EVITAR CACHÉ! ---
+    	'Sala/Sala_v2.fbx',
     	 
     	// -- onLoad (Cuando se carga bien) --
     	(fbx) => {
@@ -80,7 +80,7 @@ function init() {
         	model.position.z -= center.z;
         	model.position.y -= bbox.min.y; // Pone el piso en Y=0
 
-        	// --- LÓGICA DE TEXTURAS (Piso, Profesor, Ventanas) ---
+        	// --- LÓGICA DE TEXTURAS (Piso, Cuadros, Ventanas) ---
         	model.traverse((child) => {
             	if (child.isMesh) {
                 	child.castShadow = true;
@@ -110,12 +110,12 @@ function init() {
             	}
         	});
         	
-        	// --- POSICIÓN VR (AJUSTADA PARA 3x4m) ---
+        	// --- ¡POSICIÓN VR CORREGIDA! ---
         	vrGroup = new THREE.Group();
         	vrGroup.add(model); // Añadimos el modelo ya centrado
 
-        	// (1.5, 0, 1.5) te pone en el centro del nuevo salón de 3x4m
-        	vrGroup.position.set(1.5, 0, 1.5); 
+        	// (1.5, 0, 2.0) te pone en el centro del salón de 3x4m
+        	vrGroup.position.set(1.5, 0, 2.0); 
         	
     	 	scene.add(vrGroup);
     	 	console.log("Modelo cargado exitosamente.");
