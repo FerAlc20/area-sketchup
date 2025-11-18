@@ -26,8 +26,7 @@ function init() {
         1000
     );
 
-    // Posición inicial de la cámara en modo escritorio.
-    // VR ignora esta posición, pero sirve para vista previa.
+    // Posición inicial de la cámara en modo escritorio
     camera.position.set(0, 1.6, 3);
 
     // --- LUCES ---
@@ -43,7 +42,6 @@ function init() {
     scene.add(gridHelper);
 
     // --- RENDERIZADOR ---
-    // CORREGIDO: antialias en lugar de "antias"
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -78,16 +76,21 @@ function init() {
             // Centrar el modelo en el origen (0,0,0) y poner el piso en Y=0
             const bbox = new THREE.Box3().setFromObject(model);
             const center = bbox.getCenter(new THREE.Vector3());
+            const size = bbox.getSize(new THREE.Vector3());
+            console.log('BBox center:', center, 'size:', size);
 
+            // Poner el piso en Y=0
+            model.position.y -= bbox.min.y;
+            // Centrar en X/Z (esto deja el modelo centrado en el origen)
             model.position.x -= center.x;
             model.position.z -= center.z;
-            model.position.y -= bbox.min.y; // piso en Y=0
 
             // Ajustar materiales
             model.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+                    child.frustumCulled = false; // para que nada desaparezca en VR
 
                     const materials = Array.isArray(child.material)
                         ? child.material
@@ -96,26 +99,22 @@ function init() {
                     materials.forEach((mat) => {
                         if (!mat) return;
 
-                        // Si quieres ver ambos lados de las caras:
                         mat.side = THREE.DoubleSide;
 
                         if (mat.map) {
-                            // Corregir color
                             mat.map.encoding = THREE.sRGBEncoding;
 
-                            // --- TRANSPARENCIA PNGs (venado, reloj, etc.) ---
-                            // En vez de revisar el .src (que a veces viene como blob:...),
-                            // usamos el formato de la textura: RGBA => tiene canal alpha.
+                            // PNGs con alpha (venado, reloj, etc.)
                             if (mat.map.format === THREE.RGBAFormat) {
                                 mat.transparent = true;
-                                mat.alphaTest = 0.5; // recorta el PNG
+                                mat.alphaTest = 0.5;
                             } else {
                                 mat.transparent = false;
                                 mat.alphaTest = 0.0;
                             }
                         }
 
-                        // --- Vidrios/Ventanas por nombre de material ---
+                        // Vidrio / ventana / puerta por nombre del material
                         if (
                             mat.name &&
                             (mat.name.toLowerCase().includes('glass') ||
@@ -131,15 +130,18 @@ function init() {
             });
 
             // --- POSICIÓN VR (DENTRO DEL SALÓN) ---
-            // En VR el usuario aparece en el origen (0,0,0) del mundo.
-            // Como ya centramos el cuarto alrededor del origen y el piso está en Y=0,
-            // el jugador queda DENTRO del cuarto.
             vrGroup = new THREE.Group();
             vrGroup.add(model);
 
-            // IMPORTANTE: NO DESPLAZAR el grupo lejos del origen.
-            // Antes: vrGroup.position.set(-1.5, 0, -2.5);
+            // 1) Partimos del modelo centrado en el origen
             vrGroup.position.set(0, 0, 0);
+
+            // 2) APLICAMOS UN OFFSET PARA COLOCAR AL USUARIO DONDE QUEREMOS
+            //    Estos valores son un punto de partida: vuelve a probar y
+            //    modifica X/Z hasta que quedes justo en el centro del cuarto.
+            const vrSpawnOffset = new THREE.Vector3();
+            vrSpawnOffset.set(-1.5, 0, -2.5); // ← AJUSTA ESTO A TU GUSTO
+            vrGroup.position.add(vrSpawnOffset);
 
             scene.add(vrGroup);
 
