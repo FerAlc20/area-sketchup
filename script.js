@@ -26,8 +26,8 @@ function init() {
         1000
     );
 
-    // Posición inicial de la cámara en modo escritorio
-    // (En VR la posición la controla el casco, pero esto sirve para la vista web)
+    // Posición inicial de la cámara en modo escritorio.
+    // VR ignora esta posición, pero sirve para vista previa.
     camera.position.set(0, 1.6, 3);
 
     // --- LUCES ---
@@ -38,11 +38,12 @@ function init() {
     hemisphereLight.position.set(0, 3, 0);
     scene.add(hemisphereLight);
 
-    // --- AYUDANTES (puedes quitarlos si no los quieres) ---
+    // --- AYUDANTES (opcional) ---
     const gridHelper = new THREE.GridHelper(20, 20);
     scene.add(gridHelper);
 
     // --- RENDERIZADOR ---
+    // CORREGIDO: antialias en lugar de "antias"
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -65,10 +66,9 @@ function init() {
 
     // --- CARGADOR DE MODELO FBX ---
     const loader = new FBXLoader();
-    loader.setResourcePath('Sala/'); // carpeta donde están las texturas
+    loader.setResourcePath('Sala/');
 
     loader.load(
-        // Modelo (ajusta el nombre si cambias el archivo)
         'Sala/Sala_v2.fbx',
 
         // onLoad
@@ -83,14 +83,11 @@ function init() {
             model.position.z -= center.z;
             model.position.y -= bbox.min.y; // piso en Y=0
 
-            // Recorre el modelo para ajustar materiales
+            // Ajustar materiales
             model.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
-
-                    // Evitar que se "desactive" por frustum culling (da problemas en VR)
-                    child.frustumCulled = false;
 
                     const materials = Array.isArray(child.material)
                         ? child.material
@@ -99,23 +96,26 @@ function init() {
                     materials.forEach((mat) => {
                         if (!mat) return;
 
+                        // Si quieres ver ambos lados de las caras:
                         mat.side = THREE.DoubleSide;
 
                         if (mat.map) {
                             // Corregir color
                             mat.map.encoding = THREE.sRGBEncoding;
 
-                            // Texturas con canal alpha (PNG etc.)
+                            // --- TRANSPARENCIA PNGs (venado, reloj, etc.) ---
+                            // En vez de revisar el .src (que a veces viene como blob:...),
+                            // usamos el formato de la textura: RGBA => tiene canal alpha.
                             if (mat.map.format === THREE.RGBAFormat) {
                                 mat.transparent = true;
-                                mat.alphaTest = 0.5; // recorta el fondo
+                                mat.alphaTest = 0.5; // recorta el PNG
                             } else {
                                 mat.transparent = false;
                                 mat.alphaTest = 0.0;
                             }
                         }
 
-                        // Vidrio / ventana
+                        // --- Vidrios/Ventanas por nombre de material ---
                         if (
                             mat.name &&
                             (mat.name.toLowerCase().includes('glass') ||
@@ -126,29 +126,19 @@ function init() {
                             mat.depthWrite = false;
                             mat.alphaTest = 0.0;
                         }
-
-                        // Cortinas (ajusta el texto según el nombre del material en tu FBX)
-                        if (
-                            mat.name &&
-                            (mat.name.toLowerCase().includes('cortina') ||
-                                mat.name.toLowerCase().includes('curtain'))
-                        ) {
-                            mat.transparent = false;
-                            mat.alphaTest = 0.0;
-                            mat.depthWrite = true;
-                            mat.side = THREE.DoubleSide;
-                        }
                     });
                 }
             });
 
             // --- POSICIÓN VR (DENTRO DEL SALÓN) ---
-            // El usuario en VR aparece en (0,0,0). Como el cuarto está centrado
-            // alrededor del origen y el piso en Y=0, ya queda dentro del cuarto.
+            // En VR el usuario aparece en el origen (0,0,0) del mundo.
+            // Como ya centramos el cuarto alrededor del origen y el piso está en Y=0,
+            // el jugador queda DENTRO del cuarto.
             vrGroup = new THREE.Group();
             vrGroup.add(model);
 
-            // IMPORTANTE: no mover el grupo lejos del origen
+            // IMPORTANTE: NO DESPLAZAR el grupo lejos del origen.
+            // Antes: vrGroup.position.set(-1.5, 0, -2.5);
             vrGroup.position.set(0, 0, 0);
 
             scene.add(vrGroup);
