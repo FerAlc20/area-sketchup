@@ -10,9 +10,9 @@ let model;
 let controls;
 let vrGroup; // Grupo para posicionar el modelo en VR
 
-// Punto donde queremos que aparezca la cabeza del usuario (XZ = centro del cuarto)
-const VR_SPAWN = new THREE.Vector3(0, 0, 0);
 let hasTeleportedToCenter = false;
+const preVRPos = new THREE.Vector3(); // posición de la cámara antes de entrar a VR
+let hasPreVRPos = false;
 
 // --- INICIALIZACIÓN ---
 init();
@@ -29,7 +29,8 @@ function init() {
         0.1,
         1000
     );
-    // Vista inicial en modo escritorio
+
+    // Vista inicial en modo escritorio (ajústala donde te guste dentro del cuarto)
     camera.position.set(0, 1.6, 3);
 
     // --- LUCES ---
@@ -62,12 +63,18 @@ function init() {
     controls.target.set(0, 1.6, 0);
     controls.update();
 
-    // Resetear flag al entrar/salir de VR
+    // Guardar posición de la cámara justo antes de entrar a VR
     renderer.xr.addEventListener('sessionstart', () => {
         hasTeleportedToCenter = false;
+        preVRPos.copy(camera.position);  // donde estabas viendo el cuarto en la laptop
+        hasPreVRPos = true;
+        console.log('Sesion VR iniciada, preVRPos =', preVRPos);
     });
+
     renderer.xr.addEventListener('sessionend', () => {
         hasTeleportedToCenter = false;
+        hasPreVRPos = false;
+        console.log('Sesion VR terminada');
     });
 
     // --- CARGAR MODELO FBX ---
@@ -163,23 +170,22 @@ function init() {
 // --- LOOP ---
 function animate() {
     if (renderer.xr.isPresenting) {
-        // En el primer frame de VR, centramos al usuario en el cuarto
-        if (!hasTeleportedToCenter && vrGroup) {
+        // En el primer frame de VR, alineamos la posición VR con la de escritorio
+        if (!hasTeleportedToCenter && vrGroup && hasPreVRPos) {
             const xrCamera = renderer.xr.getCamera(camera);
             const currentPos = new THREE.Vector3();
             xrCamera.getWorldPosition(currentPos);
 
-            const desiredPos = new THREE.Vector3(
-                VR_SPAWN.x,
-                currentPos.y, // respetar altura del casco
-                VR_SPAWN.z
-            );
+            // Queremos que el usuario quede donde estaba la cámara de escritorio
+            const desiredPos = preVRPos.clone();
+            // Respetamos la altura actual del casco
+            desiredPos.y = currentPos.y;
 
             const offset = new THREE.Vector3().subVectors(desiredPos, currentPos);
             vrGroup.position.add(offset);
 
             hasTeleportedToCenter = true;
-            console.log('Usuario centrado en VR');
+            console.log('Usuario alineado a preVRPos, offset =', offset);
         }
     } else {
         // Modo escritorio normal
