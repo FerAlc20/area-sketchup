@@ -27,6 +27,7 @@ function init() {
     );
 
     // Posición inicial de la cámara en modo escritorio
+    // (En VR la posición la controla el casco, pero esto sirve para la vista web)
     camera.position.set(0, 1.6, 3);
 
     // --- LUCES ---
@@ -37,7 +38,7 @@ function init() {
     hemisphereLight.position.set(0, 3, 0);
     scene.add(hemisphereLight);
 
-    // --- AYUDANTES (opcional) ---
+    // --- AYUDANTES (puedes quitarlos si no los quieres) ---
     const gridHelper = new THREE.GridHelper(20, 20);
     scene.add(gridHelper);
 
@@ -67,7 +68,7 @@ function init() {
     loader.setResourcePath('Sala/'); // carpeta donde están las texturas
 
     loader.load(
-        // Ajusta el nombre si cambias el archivo
+        // Modelo (ajusta el nombre si cambias el archivo)
         'Sala/Sala_v2.fbx',
 
         // onLoad
@@ -88,7 +89,7 @@ function init() {
                     child.castShadow = true;
                     child.receiveShadow = true;
 
-                    // Evitar que se "desactive" por frustum culling (problemas en VR)
+                    // Evitar que se "desactive" por frustum culling (da problemas en VR)
                     child.frustumCulled = false;
 
                     const materials = Array.isArray(child.material)
@@ -104,67 +105,29 @@ function init() {
                             // Corregir color
                             mat.map.encoding = THREE.sRGBEncoding;
 
-                            // Nombre del archivo de textura
-                            let texSrc = mat.map.image && mat.map.image.src
-                                ? mat.map.image.src.toLowerCase()
-                                : '';
-
-                            const isGlassSky =
-                                texSrc.includes('translucent_glass_sky_reflection');
-                            const isGlassCorr =
-                                texSrc.includes('translucent_glass_corrugated');
-
-                            // venado / reloj (v.png, r.png)
-                            const isDeer =
-                                texSrc.includes('/v.') || texSrc.endsWith('v.png');
-                            const isClock =
-                                texSrc.includes('/r.') || texSrc.endsWith('r.png');
-
-                            // --- VIDRIO VENTANA / PUERTA (Sky) ---
-                            if (isGlassSky) {
+                            // Texturas con canal alpha (PNG etc.)
+                            if (mat.map.format === THREE.RGBAFormat) {
                                 mat.transparent = true;
-                                mat.opacity = 0.45;   // algo translúcido
-                                mat.depthWrite = false;
-                                mat.alphaTest = 0.0;
-                            }
-                            // --- VIDRIO MESA (Corrugated) ---
-                            else if (isGlassCorr) {
-                                mat.transparent = true;
-                                mat.opacity = 0.55;
-                                mat.depthWrite = false;
-                                mat.alphaTest = 0.0;
-                            }
-                            // --- PNGs recortados (venado / reloj) ---
-                            else if (
-                                texSrc.endsWith('.png') ||
-                                mat.map.format === THREE.RGBAFormat ||
-                                isDeer ||
-                                isClock
-                            ) {
-                                mat.transparent = true;
-                                mat.alphaTest = 0.5; // recorta fondo
-                                mat.depthWrite = true;
+                                mat.alphaTest = 0.5; // recorta el fondo
                             } else {
-                                // Texturas opacas normales
                                 mat.transparent = false;
                                 mat.alphaTest = 0.0;
-                                mat.depthWrite = true;
                             }
                         }
 
-                        // Fallback: si el material se llama algo con "glass" o "vidrio"
+                        // Vidrio / ventana
                         if (
                             mat.name &&
                             (mat.name.toLowerCase().includes('glass') ||
                                 mat.name.toLowerCase().includes('vidrio'))
                         ) {
                             mat.transparent = true;
-                            mat.opacity = Math.min(mat.opacity || 0.4, 0.6);
+                            mat.opacity = 0.2;
                             mat.depthWrite = false;
                             mat.alphaTest = 0.0;
                         }
 
-                        // Cortinas (si tu material se llama así en el FBX)
+                        // Cortinas (ajusta el texto según el nombre del material en tu FBX)
                         if (
                             mat.name &&
                             (mat.name.toLowerCase().includes('cortina') ||
@@ -181,9 +144,11 @@ function init() {
 
             // --- POSICIÓN VR (DENTRO DEL SALÓN) ---
             // El usuario en VR aparece en (0,0,0). Como el cuarto está centrado
-            // alrededor del origen y el piso en Y=0, queda dentro del cuarto.
+            // alrededor del origen y el piso en Y=0, ya queda dentro del cuarto.
             vrGroup = new THREE.Group();
             vrGroup.add(model);
+
+            // IMPORTANTE: no mover el grupo lejos del origen
             vrGroup.position.set(0, 0, 0);
 
             scene.add(vrGroup);
