@@ -29,8 +29,7 @@ function init() {
         0.1,
         1000
     );
-
-    // Posición inicial de la cámara en modo escritorio
+    // Vista inicial en modo escritorio
     camera.position.set(0, 1.6, 3);
 
     // --- LUCES ---
@@ -41,7 +40,7 @@ function init() {
     hemisphereLight.position.set(0, 3, 0);
     scene.add(hemisphereLight);
 
-    // --- AYUDANTES (opcional) ---
+    // --- AYUDANTE (opcional) ---
     const gridHelper = new THREE.GridHelper(20, 20);
     scene.add(gridHelper);
 
@@ -49,102 +48,101 @@ function init() {
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
-
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.shadowMap.enabled = true;
 
-    // Habilitar VR (WebXR)
+    // Habilitar VR
     renderer.xr.enabled = true;
     document.body.appendChild(renderer.domElement);
-
-    // Botón de "Enter VR"
     document.body.appendChild(VRButton.createButton(renderer));
 
-    // --- CONTROLES (Modo Escritorio) ---
+    // --- CONTROLES (modo escritorio) ---
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.target.set(0, 1.6, 0);
     controls.update();
 
-    // --- CARGADOR DE MODELO FBX ---
+    // Cuando se inicia o termina una sesión VR, reseteamos el flag
+    renderer.xr.addEventListener('sessionstart', () => {
+        hasTeleportedToCenter = false;
+    });
+    renderer.xr.addEventListener('sessionend', () => {
+        hasTeleportedToCenter = false;
+    });
+
+    // --- CARGAR MODELO FBX ---
     const loader = new FBXLoader();
     loader.setResourcePath('Sala/');
 
     loader.load(
         'Sala/Sala_v2.fbx',
-
-        // onLoad
         (fbx) => {
             model = fbx;
 
-            // Centrar el modelo en el origen (0,0,0) y poner el piso en Y=0
+            // Centrar el modelo en el origen y piso en Y=0
             const bbox = new THREE.Box3().setFromObject(model);
             const center = bbox.getCenter(new THREE.Vector3());
 
-            model.position.y -= bbox.min.y; // piso en Y=0
+            model.position.y -= bbox.min.y;   // piso en Y = 0
             model.position.x -= center.x;
             model.position.z -= center.z;
 
             // Ajustar materiales
             model.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                    child.frustumCulled = false;
+                if (!child.isMesh) return;
 
-                    const materials = Array.isArray(child.material)
-                        ? child.material
-                        : [child.material];
+                child.castShadow = true;
+                child.receiveShadow = true;
+                child.frustumCulled = false; // que no desaparezcan cosas en VR
 
-                    materials.forEach((mat) => {
-                        if (!mat) return;
+                const materials = Array.isArray(child.material)
+                    ? child.material
+                    : [child.material];
 
-                        mat.side = THREE.DoubleSide;
+                materials.forEach((mat) => {
+                    if (!mat) return;
 
-                        if (mat.map) {
-                            mat.map.encoding = THREE.sRGBEncoding;
+                    mat.side = THREE.DoubleSide;
 
-                            // PNGs (venado, reloj, etc.)
-                            if (mat.map.format === THREE.RGBAFormat) {
-                                mat.transparent = true;
-                                mat.alphaTest = 0.5;
-                            } else {
-                                mat.transparent = false;
-                                mat.alphaTest = 0.0;
-                            }
-                        }
+                    if (mat.map) {
+                        mat.map.encoding = THREE.sRGBEncoding;
 
-                        // Vidrios por nombre
-                        if (
-                            mat.name &&
-                            (mat.name.toLowerCase().includes('glass') ||
-                                mat.name.toLowerCase().includes('vidrio'))
-                        ) {
+                        if (mat.map.format === THREE.RGBAFormat) {
+                            // PNG con alpha (venado, reloj, etc.)
                             mat.transparent = true;
-                            mat.opacity = 0.2;
-                            mat.depthWrite = false;
+                            mat.alphaTest = 0.5;
+                        } else {
+                            mat.transparent = false;
                             mat.alphaTest = 0.0;
                         }
-                    });
-                }
+                    }
+
+                    // Vidrios por nombre del material
+                    if (
+                        mat.name &&
+                        (mat.name.toLowerCase().includes('glass') ||
+                            mat.name.toLowerCase().includes('vidrio'))
+                    ) {
+                        mat.transparent = true;
+                        mat.opacity = 0.2;
+                        mat.depthWrite = false;
+                        mat.alphaTest = 0.0;
+                    }
+                });
             });
 
-            // --- POSICIÓN DEL MODELO ---
+            // Grupo VR
             vrGroup = new THREE.Group();
             vrGroup.add(model);
-            vrGroup.position.set(0, 0, 0); // lo dejamos centrado
+            vrGroup.position.set(0, 0, 0);
 
             scene.add(vrGroup);
 
-            console.log('Modelo cargado exitosamente.');
+            console.log('Modelo cargado exitosamente');
         },
-
-        // onProgress
         (xhr) => {
             console.log((xhr.loaded / xhr.total) * 100 + '% cargado');
         },
-
-        // onError
         (error) => {
             console.error('Error al cargar el modelo FBX:', error);
         }
@@ -157,18 +155,15 @@ function init() {
     window.addEventListener('resize', onWindowResize);
 }
 
-// --- FUNCIONES AUXILIARES ---
-
+// --- LOOP ---
 function animate() {
     if (renderer.xr.isPresenting) {
-        // Cuando estamos en VR, en el primer frame después de entrar,
-        // movemos TODO el cuarto para que la cámara quede en el centro.
+        // En el primer frame de VR, centramos al usuario en el cuarto
         if (!hasTeleportedToCenter && vrGroup) {
             const xrCamera = renderer.xr.getCamera(camera);
             const currentPos = new THREE.Vector3();
             xrCamera.getWorldPosition(currentPos);
 
-        
             const desiredPos = new THREE.Vector3(
                 VR_SPAWN.x,
                 currentPos.y,
@@ -176,22 +171,4 @@ function animate() {
             );
 
             const offset = new THREE.Vector3().subVectors(desiredPos, currentPos);
-            vrGroup.position.add(offset);
-
-            hasTeleportedToCenter = true;
-            console.log('Teletransportado al centro del cuarto');
-        }
-    } else {
-        // Modo escritorio normal
-        controls.update();
-        hasTeleportedToCenter = false; // para que funcione de nuevo al re-entrar en VR
-    }
-
-    renderer.render(scene, camera);
-}
-
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
+            vrG
