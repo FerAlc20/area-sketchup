@@ -62,7 +62,7 @@ function init() {
     controls.target.set(0, 1.6, 0);
     controls.update();
 
-    // Cuando se inicia o termina una sesión VR, reseteamos el flag
+    // Resetear flag al entrar/salir de VR
     renderer.xr.addEventListener('sessionstart', () => {
         hasTeleportedToCenter = false;
     });
@@ -72,10 +72,11 @@ function init() {
 
     // --- CARGAR MODELO FBX ---
     const loader = new FBXLoader();
-    loader.setResourcePath('Sala/');
+    loader.setResourcePath('Sala/'); // carpeta de texturas
 
     loader.load(
         'Sala/Sala_v2.fbx',
+        // onLoad
         (fbx) => {
             model = fbx;
 
@@ -83,7 +84,9 @@ function init() {
             const bbox = new THREE.Box3().setFromObject(model);
             const center = bbox.getCenter(new THREE.Vector3());
 
-            model.position.y -= bbox.min.y;   // piso en Y = 0
+            // Piso en Y = 0
+            model.position.y -= bbox.min.y;
+            // Centrado en X/Z
             model.position.x -= center.x;
             model.position.z -= center.z;
 
@@ -107,8 +110,8 @@ function init() {
                     if (mat.map) {
                         mat.map.encoding = THREE.sRGBEncoding;
 
+                        // PNG con alpha (venado, reloj, etc.)
                         if (mat.map.format === THREE.RGBAFormat) {
-                            // PNG con alpha (venado, reloj, etc.)
                             mat.transparent = true;
                             mat.alphaTest = 0.5;
                         } else {
@@ -140,9 +143,11 @@ function init() {
 
             console.log('Modelo cargado exitosamente');
         },
+        // onProgress
         (xhr) => {
             console.log((xhr.loaded / xhr.total) * 100 + '% cargado');
         },
+        // onError
         (error) => {
             console.error('Error al cargar el modelo FBX:', error);
         }
@@ -166,9 +171,27 @@ function animate() {
 
             const desiredPos = new THREE.Vector3(
                 VR_SPAWN.x,
-                currentPos.y,
+                currentPos.y, // respetar altura del casco
                 VR_SPAWN.z
             );
 
             const offset = new THREE.Vector3().subVectors(desiredPos, currentPos);
-            vrG
+            vrGroup.position.add(offset);
+
+            hasTeleportedToCenter = true;
+            console.log('Usuario centrado en VR');
+        }
+    } else {
+        // Modo escritorio normal
+        controls.update();
+    }
+
+    renderer.render(scene, camera);
+}
+
+// --- RESIZE ---
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
